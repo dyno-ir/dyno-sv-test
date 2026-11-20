@@ -1,0 +1,23 @@
+[submodule "designs/cv32e40p/cv32e40p"]
+	path = designs/cv32e40p/cv32e40p
+	url = https://github.com/openhwgroup/cv32e40p.git
+
+[submodule "designs/picorv32/picorv32"]
+	path = designs/picorv32/picorv32
+	url = https://github.com/YosysHQ/picorv32.git
+
+[submodule "designs/serv/serv"]
+	path = designs/serv/serv
+	url = https://github.com/olofk/serv.git
+
+[submodule "designs/soomrv/SoomRV"]
+	path = designs/soomrv/SoomRV
+	url = https://github.com/mathis-s/SoomRV.git
+
+[submodule "programs/coremark/coremark"]
+	path = programs/coremark/coremark
+	url = https://github.com/eembc/coremark.git
+
+[submodule "programs/riscv-tests"]
+	path = programs/riscv-tests
+	url = https://github.com/riscv/riscv-tests.git

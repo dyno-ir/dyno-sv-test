@@ -1,0 +1,90 @@
+
+PARSE_VERILOG_PASS map(
+  "arg0": "sv/soomrv/Config.sv",
+  "arg1": "sv/soomrv/Include.sv",
+  "arg2": "sv/soomrv/ExternalAXISim.sv",
+  "arg3": "sv/soomrv/lib/FIFO.sv",
+  "arg4": "sv/soomrv/SoC_blackbox.sv",
+  "arg5": "sv/soomrv/Top.sv",
+  "arg6": "--allow-use-before-declare",
+  "arg7": "--single-unit",
+  "arg8": "--relax-enum-conversions",
+  "arg9": "--allow-hierarchical-const",
+  "arg10": "--allow-multi-driven-locals",
+  "arg11": "--std",
+  "arg12": "1800-2023",
+  "arg13": "--allow-toplevel-iface-ports",
+  "arg14": "--default-lifetime-automatic"
+)
+
+
+PARSE_DYNO_PASS map("path": "post_lower_cfg.dyno", "newModulesActive": "1")
+PARSE_DYNO_PASS map("path": "tools/dyno-opt/dyno-ir/xilinx/flipflops.dyno" /*"tools/dyno-opt/dyno-ir/sky130_fd_sc_hd.dyno"*/, "newModulesActive": "0")
+// load memories
+PARSE_DYNO_PASS map("path": "tools/dyno-opt/dyno-ir/xilinx/memories.dyno" /*"tools/dyno-opt/dyno-ir/example_memories.dyno"*/, "newModulesActive": "0")
+
+meta.RESOLVE_MODULES_PASS map("onlyLinkToInactive": "0")
+meta.POPULATE_INLINE_CACHES_PASS
+DUMP_PASS map("path": "preinlined.dyno")
+
+
+meta.NETLIST_TO_PROC_PASS
+
+
+meta.FUNCTION_INLINE_PASS
+meta.EVAL_INIT_PROCS_PASS
+meta.LIFT_STD_CELLS_PASS
+meta.REMOVE_INIT_PROCS_PASS
+
+DUMP_PASS map("path": "design2preprepre.dyno")
+meta.INST_COMBINE_PASS
+
+meta.SELECT_MODULES_PASS map("regex": ".*")
+meta.MODULE_INLINE_PASS
+DUMP_PASS map("path": "design2prepre.dyno")
+meta.SELECT_MODULES_PASS map("regex": "Top")
+
+meta.LOWER_MEM_ACCESS_PASS
+meta.INST_COMBINE_PASS
+meta.LIFT_FLIP_FLOPS_PASS
+
+meta.TRIGGER_DEDUPE_PASS
+meta.AGGRESSIVE_DEAD_CODE_ELIMINATION_PASS map("keepRegs": "NAMED")
+DUMP_PASS map("path": "design2pre.dyno")
+
+
+// early dedupe/simplification
+meta.COMMON_SUBEXPRESSION_ELIMINATION_PASS map("differentBlocks": "0", "keepLoadStoreOrder": "1")
+meta.INST_COMBINE_PASS
+
+// process fusion & ssa construction
+meta.SEQ_TO_COMB_PASS
+meta.TRIGGER_DEDUPE_PASS // fixme: check why prior does not catch all triggers
+DUMP_PASS map("path": "design2seqtocomb.dyno")
+
+meta.SSA_CONSTRUCT_PASS map("dynamicToFullRegAccess": "0")
+meta.SSA_CONSTRUCT_PASS map("mode": "DEFERRED", "dynamicToFullRegAccess": "0")
+
+
+meta.AGGRESSIVE_DEAD_CODE_ELIMINATION_PASS map("keepRegs": "NAMED")
+meta.INST_COMBINE_PASS
+
+meta.PROCESS_LINEARIZE_PASS map("retainIODeps": "1", "retainInnerDeps": "1")
+meta.SSA_CONSTRUCT_PASS map("dynamicToFullRegAccess": "0")
+meta.SSA_CONSTRUCT_PASS map("mode": "DEFERRED", "dynamicToFullRegAccess": "0")
+
+meta.LOAD_COALESCE_PASS
+meta.LOOP_SIMPLIFY_PASS
+
+meta.COMMON_SUBEXPRESSION_ELIMINATION_PASS map("differentBlocks": "1")
+meta.ORDER_INSTRS_PASS map("assertNoCircularDeps": "1", "moveStoresBeforeLoads": "0")
+
+
+meta.INST_COMBINE_PASS
+meta.PROCESS_LINEARIZE_PASS map("noFuseSortOnly": "1")
+meta.AGGRESSIVE_DEAD_CODE_ELIMINATION_PASS map("keepRegs": "NAMED")
+
+
+meta.CHECK_PASS
+DUMP_SIM_HEADER_PASS map("path": "sim_header.h")
+DUMP_PASS map("path": "design2.dyno")
