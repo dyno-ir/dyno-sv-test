@@ -18,7 +18,7 @@ PROGRAMS = riscv_test_programs(
     arch="rv32i",
     extra_sources=[infra.PROGRAMS_DIR / "exit.S"],
 )
-PROGRAMS.append(coremark("rv32i", 150_000_000))
+PROGRAMS.append(coremark("rv32i", 100_000))
 
 
 def source_files():

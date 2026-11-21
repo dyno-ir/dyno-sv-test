@@ -25,6 +25,14 @@ PROGRAMS.append(coremark("rv32i", 10_000_000))
 def apply_patch():
     if not REPO.exists():
         raise RuntimeError(f"missing picorv32 checkout: {REPO}")
+    if infra.DRY_RUN:
+        infra.run(
+            ["git", "-C", str(REPO), "apply", str(PATCH)],
+            REPO / "patch.log",
+            REPO,
+            60,
+        )
+        return
     applied = subprocess.run(
         ["git", "-C", str(REPO), "apply", "--reverse", "--check", str(PATCH)],
         capture_output=True,

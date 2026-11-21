@@ -1,4 +1,3 @@
-import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -80,10 +79,16 @@ def build(program, work, timeout):
         objects.append(obj)
 
     elf = work / f"{program.name}.elf"
-    libgcc = subprocess.check_output(
+    libgcc_log = work / f"{program.name}_libgcc.log"
+    result = infra.run(
         ["riscv32-elf-gcc", f"-march={program.arch}", "-mabi=ilp32", "-print-libgcc-file-name"],
-        text=True,
-    ).strip()
+        libgcc_log,
+        work,
+        timeout,
+    )
+    if result["status"] != "ok":
+        return None, result
+    libgcc = libgcc_log.read_text().strip() if libgcc_log.exists() else "<libgcc>"
     if program.linker:
         command = [
             "riscv32-elf-ld",

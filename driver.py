@@ -69,28 +69,21 @@ def main():
     selected = args.targets or targets
     infra.DRY_RUN = args.dry_run
     run = {"targets": {}}
+    failed = False
     for name in selected:
-        print(f"=== {name} ===", file=sys.stderr, flush=True)
-        run["targets"][name] = load_target(name).run(args)
+        infra.progress(f"=== {name} ===")
+        target = load_target(name).run(args)
+        run["targets"][name] = target
+        if not args.dry_run:
+            if target_failed(target):
+                infra.progress(f"result: {infra.status_text('failed')}")
+                failed = True
+            else:
+                infra.progress(f"result: {infra.status_text('ok')}")
     if not args.dry_run:
         out = Path(args.out)
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(run, indent=2) + "\n")
-        failed = False
-        for name, target in run["targets"].items():
-            statuses = []
-            for tech, synth in target.get("synth", {}).items():
-                statuses.append(f"synth.{tech}={synth['status']}")
-            for key in ("sim", "gl_sim"):
-                sim = target.get(key)
-                if sim:
-                    statuses.append(f"{key}={sim['status']}")
-            comparison = target.get("comparison")
-            if comparison:
-                statuses.append(f"comparison={comparison['status']}")
-            print(f"{name}: {' '.join(statuses)}")
-            if target_failed(target):
-                failed = True
         return 1 if failed else 0
     return 0
 
