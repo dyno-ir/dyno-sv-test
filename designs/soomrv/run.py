@@ -247,9 +247,9 @@ def run_tests(work, binary, isa_dir, args, timeout):
             if elf.name in EXCLUDE:
                 continue
             commands.append(
-                {
-                    "name": elf.name,
-                    "cmd": [
+                infra.Command(
+                    name=elf.name,
+                    cmd=[
                         str(binary),
                         "-i",
                         str(work / "design.dyno"),
@@ -261,15 +261,15 @@ def run_tests(work, binary, isa_dir, args, timeout):
                         "-t",
                         str(elf),
                     ],
-                }
+                )
             )
     elf, error = build_soomrv_program(work, timeout)
     if error:
         return error
     commands.append(
-        {
-            "name": "virtual_mem",
-            "cmd": [
+        infra.Command(
+            name="virtual_mem",
+            cmd=[
                 str(binary),
                 "-i",
                 str(work / "design.dyno"),
@@ -280,10 +280,10 @@ def run_tests(work, binary, isa_dir, args, timeout):
                 "-q",
                 str(elf),
             ],
-        }
+        )
     )
     return infra.run_commands(
-        commands, work, timeout, log_prefix="test", progress_prefix="tests"
+        commands, work, timeout, log_prefix="test", progress_prefix="sim programs"
     )
 
 

@@ -33,5 +33,7 @@ def run(args):
     built, error = build_all(PROGRAMS, work, args.sim_timeout)
     if error:
         return {"name": NAME, "synth": {}, "sim": error}
-    gl_built = [program for program in built if program["name"] not in GL_EXCLUDE]
-    return infra.run_target(NAME, source_files(), TOP, SIM_TOP, TB, args, "SERV ", built, gl_built)
+    gl_built = [program for program in built if program.name not in GL_EXCLUDE]
+    return infra.run_target(
+        NAME, source_files(), TOP, SIM_TOP, TB, args, "SERV ", built, gl_built
+    )

@@ -7,6 +7,7 @@ import sys
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 TEST_DIR = Path(__file__).resolve().parent
@@ -61,6 +62,47 @@ _COLORS = {
     "partial": "\033[33m",
 }
 _RESET = "\033[0m"
+
+
+@dataclass
+class BuiltProgram:
+    name: str
+    bin: str
+    elf: str
+    mmio: int
+    halt: int
+    cycles: int | None
+    benchmark: bool
+
+
+@dataclass
+class Command:
+    name: str
+    cmd: list[str | Path]
+    program: BuiltProgram | None = None
+    cycles: int | None = None
+    summary_prefix: str | None = None
+    allow_partial: bool = False
+
+
+@dataclass
+class JobResult:
+    name: str
+    index: int
+    status: str
+    returncode: int
+    log: str
+    elapsed_s: float
+    summary: str | None = None
+    output: str | None = None
+    cycles: int | None = None
+    benchmark: bool = False
+    mismatch_lines: int = 0
+    instret: int | None = None
+    error: str | None = None
+
+    def to_dict(self):
+        return {key: value for key, value in asdict(self).items() if value is not None}
 
 
 def status_text(status):
@@ -258,12 +300,12 @@ def build_testbench(harness, include_dir, out, work, timeout, log=None, label="b
 
 
 def run_commands(
-    items,
+    items: list[Command | BuiltProgram],
     work,
     timeout,
     log_prefix="test",
     workers=None,
-    result_key="tests",
+    result_key="programs",
     progress_prefix=None,
     binary=None,
     dyno=None,
@@ -275,29 +317,29 @@ def run_commands(
 ):
     commands = []
     for item in items:
-        if "cmd" in item:
+        if isinstance(item, Command):
             commands.append(item)
             continue
-        limit = item.get("cycles") or default_cycles
+        limit = item.cycles or default_cycles
         if cycle_cap is not None:
             limit = min(limit, cycle_cap)
         commands.append(
-            {
-                "name": item["name"],
-                "cmd": [
+            Command(
+                name=item.name,
+                cmd=[
                     binary,
                     dyno,
                     str(limit),
                     top,
-                    item["bin"],
-                    str(item["mmio"]),
-                    str(item["halt"]),
+                    item.bin,
+                    str(item.mmio),
+                    str(item.halt),
                 ],
-                "program": item,
-                "cycles": limit,
-                "summary_prefix": summary_prefix,
-                "allow_partial": allow_partial,
-            }
+                program=item,
+                cycles=limit,
+                summary_prefix=summary_prefix,
+                allow_partial=allow_partial,
+            )
         )
     if not commands:
         return {
@@ -313,34 +355,33 @@ def run_commands(
     progress_prefix = progress_prefix or log_prefix
 
     def run_one(index, command):
-        name = command["name"]
-        progress(f"{progress_prefix}: {index}/{len(commands)} {name}")
+        name = command.name
         log = work / f"{log_prefix}_{name}.log"
         job_work = work / f"{log_prefix}_{name}"
         if job_work.exists():
             shutil.rmtree(job_work)
         job_work.mkdir(parents=True)
-        result = run(command["cmd"], log, job_work, timeout)
+        result = run(command.cmd, log, job_work, timeout)
         text = log.read_text(errors="replace") if log.exists() else ""
-        item = {
-            "name": name,
-            "index": index,
-            "log": str(log),
-            "returncode": result["returncode"],
-            "elapsed_s": result["elapsed_s"],
-        }
-        program = command.get("program")
-        if program:
+        job = JobResult(
+            name=name,
+            index=index,
+            status=result["status"],
+            returncode=result["returncode"],
+            log=str(log),
+            elapsed_s=result["elapsed_s"],
+        )
+        if command.program:
             summary = (
                 next(
                     (
                         line.strip()
                         for line in text.splitlines()
-                        if line.startswith(command["summary_prefix"])
+                        if line.startswith(command.summary_prefix)
                     ),
                     None,
                 )
-                if command["summary_prefix"]
+                if command.summary_prefix
                 else None
             )
             output = text.split("OUTPUT: ", 1)[1].strip() if "OUTPUT: " in text else ""
@@ -349,20 +390,16 @@ def run_commands(
             elif "partial=true" in summary:
                 status = (
                     "partial"
-                    if command["allow_partial"] and program.get("benchmark")
+                    if command.allow_partial and command.program.benchmark
                     else "failed"
                 )
             else:
                 status = "ok"
-            item.update(
-                {
-                    "status": status,
-                    "summary": summary,
-                    "output": output,
-                    "cycles": command["cycles"],
-                    "benchmark": program.get("benchmark", False),
-                }
-            )
+            job.status = status
+            job.summary = summary
+            job.output = output
+            job.cycles = command.cycles
+            job.benchmark = command.program.benchmark
         else:
             mismatch_lines = text.count("mismatch")
             match = re.search(r"instret:\s+(\d+)", text)
@@ -376,33 +413,28 @@ def run_commands(
                     else instret is not None and instret > 0
                 )
             )
-            item.update(
-                {"status": "ok" if ok else "failed", "mismatch_lines": mismatch_lines}
-            )
-            if instret is not None:
-                item["instret"] = instret
-        if result.get("error"):
-            item["error"] = result["error"]
-        instret = f", instret={item['instret']}" if "instret" in item else ""
+            job.status = "ok" if ok else "failed"
+            job.mismatch_lines = mismatch_lines
+            job.instret = instret
+        job.error = result.get("error")
+        instret = f", instret={job.instret}" if job.instret is not None else ""
         progress(
             f"{progress_prefix}: {index}/{len(commands)} {name}: "
-            f"{status_text(item['status'])}{instret}, {item['elapsed_s']:.1f}s"
+            f"{status_text(job.status)}{instret}, {job.elapsed_s:.1f}s"
         )
-        return item
+        return job
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        items = list(pool.map(run_one, range(1, len(commands) + 1), commands))
-    mismatch_lines = sum(item.pop("mismatch_lines", 0) for item in items)
-    passed_count = sum(item["status"] == "ok" for item in items)
-    status = (
-        "ok" if all(item["status"] in ("ok", "partial") for item in items) else "failed"
-    )
-    summary = items[-1].get("summary")
+        jobs = list(pool.map(run_one, range(1, len(commands) + 1), commands))
+    mismatch_lines = sum(job.mismatch_lines for job in jobs)
+    passed_count = sum(job.status == "ok" for job in jobs)
+    status = "ok" if all(job.status in ("ok", "partial") for job in jobs) else "failed"
+    summary = jobs[-1].summary
     if summary is None:
-        summary = f"{passed_count}/{len(items)} {'tests' if result_key == 'tests' else 'programs'} passed"
+        summary = f"{passed_count}/{len(jobs)} {result_key} passed"
     return {
         "status": status,
-        result_key: items,
+        result_key: [job.to_dict() for job in jobs],
         "summary": summary,
         "mismatch_lines": mismatch_lines,
     }

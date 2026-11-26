@@ -42,9 +42,6 @@ def collect(build, out, workspace):
                 for program in sim.get("programs", []):
                     if program.get("status") not in ("ok", "partial"):
                         copy_log(program.get("log"), workspace, out, seen)
-                for test in sim.get("tests", []):
-                    if test.get("status") != "ok":
-                        copy_log(test.get("log"), workspace, out, seen)
 
 
 def main():

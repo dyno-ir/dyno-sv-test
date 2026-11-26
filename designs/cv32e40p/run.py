@@ -21,6 +21,7 @@ PROGRAMS = riscv_test_programs(
 )
 PROGRAMS.append(coremark("rv32imac", 1_500_000))
 
+
 def source_files():
     manifest = REPO / "cv32e40p_manifest.flist"
     files = []
@@ -49,5 +50,7 @@ def run(args):
     built, error = build_all(PROGRAMS, work, args.sim_timeout)
     if error:
         return {"name": NAME, "synth": {}, "sim": error}
-    gl_built = [program for program in built if program["name"] not in GL_EXCLUDE]
-    return infra.run_target(NAME, source_files(), TOP, SIM_TOP, TB, args, "CV32E40P ", built, gl_built)
+    gl_built = [program for program in built if program.name not in GL_EXCLUDE]
+    return infra.run_target(
+        NAME, source_files(), TOP, SIM_TOP, TB, args, "CV32E40P ", built, gl_built
+    )

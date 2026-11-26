@@ -81,7 +81,12 @@ def build(program, work, timeout):
     elf = work / f"{program.name}.elf"
     libgcc_log = work / f"{program.name}_libgcc.log"
     result = infra.run(
-        ["riscv32-elf-gcc", f"-march={program.arch}", "-mabi=ilp32", "-print-libgcc-file-name"],
+        [
+            "riscv32-elf-gcc",
+            f"-march={program.arch}",
+            "-mabi=ilp32",
+            "-print-libgcc-file-name",
+        ],
         libgcc_log,
         work,
         timeout,
@@ -127,15 +132,18 @@ def build(program, work, timeout):
     )
     if result["status"] != "ok":
         return None, result
-    return {
-        "name": program.name,
-        "bin": str(binary),
-        "elf": str(elf),
-        "mmio": program.mmio,
-        "halt": program.halt,
-        "cycles": program.cycles,
-        "benchmark": program.benchmark,
-    }, None
+    return (
+        infra.BuiltProgram(
+            name=program.name,
+            bin=str(binary),
+            elf=str(elf),
+            mmio=program.mmio,
+            halt=program.halt,
+            cycles=program.cycles,
+            benchmark=program.benchmark,
+        ),
+        None,
+    )
 
 
 def build_all(programs, work, timeout):
@@ -148,11 +156,19 @@ def build_all(programs, work, timeout):
     return built, None
 
 
-def riscv_test_programs(categories, exclude, arch, extra_sources=None,
-                        linker=None, entry="mytest", include=None,
-                        mmio=infra.MMIO_BASE, halt=infra.HALT_ADDR,
-                        header_dir=RISCV_TEST_HEADER_DIR,
-                        cycles=1_000_000):
+def riscv_test_programs(
+    categories,
+    exclude,
+    arch,
+    extra_sources=None,
+    linker=None,
+    entry="mytest",
+    include=None,
+    mmio=infra.MMIO_BASE,
+    halt=infra.HALT_ADDR,
+    header_dir=RISCV_TEST_HEADER_DIR,
+    cycles=1_000_000,
+):
     programs = []
     exclude = set(exclude)
     for category in categories:
@@ -205,7 +221,13 @@ def coremark(arch, cycles):
         entry="_start",
         linker=root / "link.ld",
         include=[coremark, coremark / "barebones"],
-        defines=["ITERATIONS=1", "HAS_FLOAT=0", "FLAGS_STR=\"-O2\"", f"MMIO_BASE={infra.MMIO_BASE}", f"HALT_ADDR={infra.HALT_ADDR}"],
+        defines=[
+            "ITERATIONS=1",
+            "HAS_FLOAT=0",
+            'FLAGS_STR="-O2"',
+            f"MMIO_BASE={infra.MMIO_BASE}",
+            f"HALT_ADDR={infra.HALT_ADDR}",
+        ],
         benchmark=True,
         arch=arch,
         cycles=cycles,

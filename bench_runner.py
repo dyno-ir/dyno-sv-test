@@ -51,10 +51,19 @@ def run_driver(cmd, cores, margin, poll):
             if line.startswith("=== "):
                 allowed = os.cpu_count() or 1
                 reset()
-            elif line.startswith(("sim programs", "gl programs", "tests:")):
+            elif line.startswith(("sim programs", "gl programs")):
                 allowed = cores
                 reset()
-            elif line.startswith(("synth", "RTL", "GL checkpoint", "riscv-isa-sim build", "cosim build", "riscv-tests build")):
+            elif line.startswith(
+                (
+                    "synth",
+                    "RTL",
+                    "GL checkpoint",
+                    "riscv-isa-sim build",
+                    "cosim build",
+                    "riscv-tests build",
+                )
+            ):
                 allowed = os.cpu_count() or 1
                 reset()
 
@@ -82,10 +91,15 @@ def commit_and_push(out):
         return
     git = ["git", "-C", str(REPO)]
     subprocess.run(git + ["add", "--", str(rel)], check=True)
-    if subprocess.run(git + ["diff", "--cached", "--quiet", "--", str(rel)]).returncode == 0:
+    if (
+        subprocess.run(git + ["diff", "--cached", "--quiet", "--", str(rel)]).returncode
+        == 0
+    ):
         return
     stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    subprocess.run(git + ["commit", "-m", f"bench: {stamp}", "--", str(rel)], check=True)
+    subprocess.run(
+        git + ["commit", "-m", f"bench: {stamp}", "--", str(rel)], check=True
+    )
     subprocess.run(git + ["push"], check=True)
 
 
